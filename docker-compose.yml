@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   ashdot-app:
     container_name: ashdot_monolith
