@@ -1,0 +1,118 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id            String @id @default(uuid())
+  username      String @unique
+  password_hash String
+  role          String // "EDITOR" or "VIEWER"
+}
+
+model Building {
+  id                 String              @id
+  house_number       Int                 @unique
+  map_x              Float
+  map_y              Float
+  units_per_building Int
+  ResidentApartments ResidentApartment[]
+  StudentApartments  StudentApartment[]
+}
+
+model ResidentApartment {
+  id              String   @id @default(uuid())
+  building_id     String
+  building        Building @relation(fields: [building_id], references: [id])
+  apartment_name  String
+  floor           String
+  tenant_name     String
+  owner_name      String
+  rent            Float?
+  square_meters   Float?   @default(0)
+  arnona_id       String
+  water_id        String   @default("")
+  electricity_id  String   @default("")
+  contract_end    String
+  is_linked       Boolean  @default(false)
+  phone           String
+  email           String
+  payment_dest    String   @default("")
+  maintenance_log String   @default("")
+  is_active       Boolean  @default(true)
+}
+
+model StudentApartment {
+  id              String   @id @default(uuid())
+  building_id     String
+  building        Building @relation(fields: [building_id], references: [id])
+  apartment_num   Int
+  tenant_name     String
+  rent            Float?
+  arnona_id       String
+  water_id        String
+  contract_end    String
+  phone           String
+  email           String
+  payment_dest    String   @default("")
+  maintenance_log String   @default("")
+  is_active       Boolean  @default(true)
+}
+
+model Business {
+  id              String  @id @default(uuid())
+  business_name   String
+  owner_name      String
+  location        String
+  parcel_id       Int
+  rent            Float?
+  arnona_id       String
+  water_id        String
+  contract_end    String
+  phone           String
+  email           String
+  status          String // "הוסדר", "בטיפול", 'לא התקבל דו"ח מרמ"י'
+  maintenance_log String  @default("")
+  square_meters   Float?
+  is_active       Boolean @default(true)
+}
+
+model Employee {
+  id         String  @id @default(uuid())
+  name       String
+  role       String
+  department String
+  salary     Float
+  notes      String  @default("")
+  is_active  Boolean @default(true)
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  category    String
+  description String
+  amount      Float
+  frequency   String   // "חד פעמי", "חודשי", "שנתי"
+  date        DateTime @default(now())
+  is_active   Boolean  @default(true)
+}
+
+model MaintenanceIssue {
+  id          String   @id @default(uuid())
+  building_id String
+  type        String   // "מדרגות", "ביוב", "גג", "חשמל" etc.
+  status      String   // "לטפל", "בטיפול", "טופל", "מושהה"
+  description String   @default("")
+  cost        Float    @default(0)
+  date        String   @default("")
+  supplier    String   @default("")
+  category    String   @default("external") // "external" (חיצוני) or "internal" (פנימי)
+  is_active   Boolean  @default(true)
+}
