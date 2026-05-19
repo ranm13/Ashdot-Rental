@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  ashdot-app:
+    container_name: ashdot_monolith
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ashdot-data:/data
+    environment:
+      - DATABASE_URL=file:/data/production.db
+      - PORT=3000
+    restart: unless-stopped
+
+volumes:
+  ashdot-data:
+    driver: local

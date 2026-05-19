@@ -1,0 +1,12 @@
+node_modules
+dist
+server/node_modules
+server/dist
+server/dev.db
+server/prisma/dev.db
+.git
+.gitignore
+README.md
+docs
+artifacts
+.gemini

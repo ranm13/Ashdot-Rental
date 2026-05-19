@@ -3,11 +3,20 @@ import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
 import 'dotenv/config';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const prisma = new PrismaClient();
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Serve static assets from 'public' directory
+const publicPath = path.resolve(__dirname, '../public');
+app.use(express.static(publicPath));
 
 // --- RESIDENTS ---
 app.get('/api/residents', async (req, res) => {
@@ -302,6 +311,18 @@ async function seedDefaultExpenses() {
     console.error('Error seeding default expenses:', err);
   }
 }
+
+// Wildcard route to serve index.html for frontend routing (Vite SPA)
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  res.sendFile(path.join(publicPath, 'index.html'), (err) => {
+    if (err) {
+      res.status(404).send('Not Found');
+    }
+  });
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
