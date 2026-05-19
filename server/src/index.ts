@@ -313,7 +313,7 @@ async function seedDefaultExpenses() {
 }
 
 // Wildcard route to serve index.html for frontend routing (Vite SPA)
-app.get('*', (req, res, next) => {
+app.get('*splat', (req, res, next) => {
   if (req.path.startsWith('/api')) {
     return next();
   }
