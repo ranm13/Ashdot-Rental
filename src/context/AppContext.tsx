@@ -12,6 +12,10 @@ interface AppContextType {
   employees: any[];
   expenses: any[];
   maintenanceIssues: any[];
+  addResident: (data: any) => Promise<void>;
+  addStudent: (data: any) => Promise<void>;
+  addBusiness: (data: any) => Promise<void>;
+  addBuilding: (data: any) => Promise<void>;
   updateResident: (id: string, data: Partial<ResidentApartment>) => Promise<void>;
   batchUpdateResidents: (data: any[]) => Promise<void>;
   updateStudent: (id: string, data: Partial<StudentApartment>) => Promise<void>;
@@ -71,6 +75,71 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     loadData();
   }, []);
+
+  const addResident = async (data: any) => {
+    const res = await fetch(`${API_URL}/residents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) {
+      const added = await res.json();
+      setResidents(prev => [...prev, added]);
+      const buildingsRes = await fetch(`${API_URL}/buildings`);
+      if (buildingsRes.ok) {
+        const buildingsData = await buildingsRes.json();
+        setBuildings(buildingsData);
+      }
+    }
+  };
+
+  const addStudent = async (data: any) => {
+    const res = await fetch(`${API_URL}/students`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) {
+      const added = await res.json();
+      setStudents(prev => [...prev, added]);
+      const buildingsRes = await fetch(`${API_URL}/buildings`);
+      if (buildingsRes.ok) {
+        const buildingsData = await buildingsRes.json();
+        setBuildings(buildingsData);
+      }
+    }
+  };
+
+  const addBusiness = async (data: any) => {
+    const res = await fetch(`${API_URL}/businesses`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) {
+      const added = await res.json();
+      setBusinesses(prev => [...prev, added]);
+    }
+  };
+
+  const addBuilding = async (data: any) => {
+    const res = await fetch(`${API_URL}/buildings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) {
+      const added = await res.json();
+      setBuildings(prev => {
+        const exists = prev.some(b => b.id === added.id);
+        if (exists) {
+          return prev.map(b => b.id === added.id ? added : b);
+        } else {
+          return [...prev, added];
+        }
+      });
+    }
+  };
 
   const updateResident = async (id: string, data: Partial<ResidentApartment>) => {
     const res = await fetch(`${API_URL}/residents/${id}`, {
@@ -254,6 +323,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     <AppContext.Provider value={{
       role, setRole,
       residents, students, businesses, buildings, employees, expenses, maintenanceIssues,
+      addResident, addStudent, addBusiness, addBuilding,
       updateResident, batchUpdateResidents, updateStudent, batchUpdateStudents, updateBusiness,
       softDeleteResident, softDeleteStudent, softDeleteBusiness,
       splitResident,

@@ -24,6 +24,35 @@ app.get('/api/residents', async (req, res) => {
   res.json(data);
 });
 
+app.post('/api/residents', async (req, res) => {
+  const { building_number, rent, square_meters, ...rest } = req.body;
+  const hNum = Number(building_number);
+  
+  let building = await prisma.building.findUnique({ where: { house_number: hNum } });
+  if (!building) {
+    building = await prisma.building.create({
+      data: {
+        id: String(hNum),
+        house_number: hNum,
+        map_x: 0,
+        map_y: 0,
+        units_per_building: 1
+      }
+    });
+  }
+
+  const newApt = await prisma.residentApartment.create({
+    data: {
+      ...rest,
+      building_id: building.id,
+      rent: rent ? Number(rent) : null,
+      square_meters: square_meters ? Number(square_meters) : 0,
+      is_active: true
+    }
+  });
+  res.json(newApt);
+});
+
 app.put('/api/residents/:id', async (req, res) => {
   const { id } = req.params;
   const data = await prisma.residentApartment.update({
@@ -123,6 +152,35 @@ app.get('/api/students', async (req, res) => {
   res.json(data);
 });
 
+app.post('/api/students', async (req, res) => {
+  const { building_number, rent, apartment_num, ...rest } = req.body;
+  const hNum = Number(building_number);
+
+  let building = await prisma.building.findUnique({ where: { house_number: hNum } });
+  if (!building) {
+    building = await prisma.building.create({
+      data: {
+        id: String(hNum),
+        house_number: hNum,
+        map_x: 0,
+        map_y: 0,
+        units_per_building: 1
+      }
+    });
+  }
+
+  const newApt = await prisma.studentApartment.create({
+    data: {
+      ...rest,
+      building_id: building.id,
+      apartment_num: Number(apartment_num) || 1,
+      rent: rent ? Number(rent) : null,
+      is_active: true
+    }
+  });
+  res.json(newApt);
+});
+
 app.put('/api/students/:id', async (req, res) => {
   const { id } = req.params;
   const data = await prisma.studentApartment.update({
@@ -145,6 +203,20 @@ app.delete('/api/students/:id', async (req, res) => {
 app.get('/api/businesses', async (req, res) => {
   const data = await prisma.business.findMany({ where: { is_active: true } });
   res.json(data);
+});
+
+app.post('/api/businesses', async (req, res) => {
+  const { rent, square_meters, parcel_id, ...rest } = req.body;
+  const newBiz = await prisma.business.create({
+    data: {
+      ...rest,
+      rent: rent ? Number(rent) : null,
+      square_meters: square_meters ? Number(square_meters) : null,
+      parcel_id: Number(parcel_id) || 0,
+      is_active: true
+    }
+  });
+  res.json(newBiz);
 });
 
 app.put('/api/businesses/:id', async (req, res) => {
@@ -227,6 +299,23 @@ app.delete('/api/expenses/:id', async (req, res) => {
 app.get('/api/buildings', async (req, res) => {
   const data = await prisma.building.findMany();
   res.json(data);
+});
+
+app.post('/api/buildings', async (req, res) => {
+  const { house_number, map_x, map_y } = req.body;
+  const hNum = Number(house_number);
+  const building = await prisma.building.upsert({
+    where: { house_number: hNum },
+    update: { map_x: Number(map_x), map_y: Number(map_y) },
+    create: {
+      id: String(hNum),
+      house_number: hNum,
+      map_x: Number(map_x),
+      map_y: Number(map_y),
+      units_per_building: 1
+    }
+  });
+  res.json(building);
 });
 
 // --- MAINTENANCE ---

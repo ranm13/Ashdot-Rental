@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Download, Edit2, Trash2, Check, X, Search, Filter, LayoutList, LayoutGrid, Wrench, Phone } from 'lucide-react';
+import { Download, Edit2, Trash2, Check, X, Search, Filter, LayoutList, LayoutGrid, Wrench, Phone, Plus } from 'lucide-react';
 import HouseEditModal from './HouseEditModal';
 import MaintenanceModal from './MaintenanceModal';
 import StudentHouseEditModal from './StudentHouseEditModal';
 import BusinessEditModal from './BusinessEditModal';
+import AddPropertyModal from './AddPropertyModal';
 
 interface Props {
   type: 'Resident' | 'Student' | 'Business';
@@ -27,6 +28,7 @@ const PropertyTables: React.FC<Props> = ({ type }) => {
   const [studentEditBuildingId, setStudentEditBuildingId] = useState<string | null>(null);
   const [maintBuildingId, setMaintBuildingId] = useState<string | null>(null);
   const [editBusiness, setEditBusiness] = useState<any | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Sub-Tabs State
   const [activeSubTab, setActiveSubTab] = useState<'table' | 'maintenance' | 'maintenance_external' | 'maintenance_internal' | 'dashboard'>('table');
@@ -474,6 +476,25 @@ const PropertyTables: React.FC<Props> = ({ type }) => {
           <button className="msv" onClick={handleExport} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Download size={16} /> ייצא לאקסל
           </button>
+          {isEditor && (
+            <button 
+              onClick={() => setShowAddModal(true)} 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#22c55e',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '8px 16px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              <Plus size={16} /> הוסף {type === 'Resident' ? 'דירה' : type === 'Student' ? 'דירת סטודנט' : 'עסק'}
+            </button>
+          )}
         </div>
       </div>
  
@@ -857,6 +878,14 @@ const PropertyTables: React.FC<Props> = ({ type }) => {
         <BusinessEditModal 
           business={editBusiness} 
           onClose={() => setEditBusiness(null)} 
+        />
+      )}
+
+      {/* Add New Property Modal */}
+      {showAddModal && (
+        <AddPropertyModal 
+          type={type} 
+          onClose={() => setShowAddModal(false)} 
         />
       )}
     </div>
