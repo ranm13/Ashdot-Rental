@@ -9,7 +9,7 @@ interface MaintenanceModalProps {
 
 const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ buildingId, onClose }) => {
   const { maintenanceIssues, addMaintenanceIssue, softDeleteMaintenanceIssue, role } = useAppContext();
-  const isEditor = role === 'Editor';
+  const isEditor = role === 'Admin';
 
   const [type, setType] = useState('מדרגות');
   const [status, setStatus] = useState('לטפל');

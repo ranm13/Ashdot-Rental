@@ -11,7 +11,7 @@ interface BusinessEditModalProps {
 const BusinessEditModal: React.FC<BusinessEditModalProps> = ({ business, onClose }) => {
   const { updateBusiness, role } = useAppContext();
   const [form, setForm] = useState<Partial<Business>>({});
-  const isEditor = role === 'Editor';
+  const isEditor = role === 'Admin';
 
   useEffect(() => {
     setForm({ ...business });

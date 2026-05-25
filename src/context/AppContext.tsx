@@ -12,6 +12,11 @@ interface AppContextType {
   employees: any[];
   expenses: any[];
   maintenanceIssues: any[];
+  token: string | null;
+  user: any | null;
+  login: (token: string, user: any) => void;
+  logout: () => void;
+  isAuthenticated: boolean;
   addResident: (data: any) => Promise<void>;
   addStudent: (data: any) => Promise<void>;
   addBusiness: (data: any) => Promise<void>;
@@ -40,7 +45,25 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const API_URL = import.meta.env.VITE_API_URL || (window.location.origin.includes('5173') ? 'http://localhost:3000/api' : '/api');
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [role, setRole] = useState<Role>('Editor');
+  const [token, setToken] = useState<string | null>(localStorage.getItem('ashdot_token'));
+  const [user, setUser] = useState<any | null>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('ashdot_user') || 'null');
+    } catch {
+      return null;
+    }
+  });
+
+  const [role, setRole] = useState<Role>(() => {
+    try {
+      const savedUser = JSON.parse(localStorage.getItem('ashdot_user') || 'null');
+      if (savedUser) {
+        return savedUser.role === 'ADMIN' ? 'Admin' : 'Read-Only';
+      }
+    } catch {}
+    return 'Read-Only';
+  });
+
   const [residents, setResidents] = useState<ResidentApartment[]>([]);
   const [students, setStudents] = useState<StudentApartment[]>([]);
   const [businesses, setBusinesses] = useState<Business[]>([]);
@@ -49,16 +72,62 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [expenses, setExpenses] = useState<any[]>([]);
   const [maintenanceIssues, setMaintenanceIssues] = useState<any[]>([]);
 
+  const login = (newToken: string, newUser: any) => {
+    localStorage.setItem('ashdot_token', newToken);
+    localStorage.setItem('ashdot_user', JSON.stringify(newUser));
+    setToken(newToken);
+    setUser(newUser);
+    setRole(newUser.role === 'ADMIN' ? 'Admin' : 'Read-Only');
+  };
+
+  const logout = () => {
+    localStorage.removeItem('ashdot_token');
+    localStorage.removeItem('ashdot_user');
+    setToken(null);
+    setUser(null);
+    setRole('Read-Only');
+    // Clear all loaded data
+    setResidents([]);
+    setStudents([]);
+    setBusinesses([]);
+    setBuildings([]);
+    setEmployees([]);
+    setExpenses([]);
+    setMaintenanceIssues([]);
+  };
+
+  // Auth fetch wrapper
+  const authFetch = async (url: string, options: RequestInit = {}) => {
+    const currentToken = token || localStorage.getItem('ashdot_token');
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+      ...(currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {})
+    };
+
+    const res = await fetch(url, { ...options, headers });
+
+    if (res.status === 401) {
+      logout();
+      throw new Error('Unauthorized');
+    }
+
+    return res;
+  };
+
   const loadData = async () => {
+    const currentToken = token || localStorage.getItem('ashdot_token');
+    if (!currentToken) return;
+
     try {
       const [resData, stuData, bizData, mapData, empData, expData, maintData] = await Promise.all([
-        fetch(`${API_URL}/residents`).then(r => r.json()),
-        fetch(`${API_URL}/students`).then(r => r.json()),
-        fetch(`${API_URL}/businesses`).then(r => r.json()),
-        fetch(`${API_URL}/buildings`).then(r => r.json()),
-        fetch(`${API_URL}/employees`).then(r => r.json()),
-        fetch(`${API_URL}/expenses`).then(r => r.json()),
-        fetch(`${API_URL}/maintenance`).then(r => r.json()),
+        authFetch(`${API_URL}/residents`).then(r => r.json()),
+        authFetch(`${API_URL}/students`).then(r => r.json()),
+        authFetch(`${API_URL}/businesses`).then(r => r.json()),
+        authFetch(`${API_URL}/buildings`).then(r => r.json()),
+        authFetch(`${API_URL}/employees`).then(r => r.json()),
+        authFetch(`${API_URL}/expenses`).then(r => r.json()),
+        authFetch(`${API_URL}/maintenance`).then(r => r.json()),
       ]);
       setResidents(resData);
       setStudents(stuData);
@@ -73,19 +142,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (token) {
+      loadData();
+    }
+  }, [token]);
 
   const addResident = async (data: any) => {
-    const res = await fetch(`${API_URL}/residents`, {
+    const res = await authFetch(`${API_URL}/residents`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (res.ok) {
       const added = await res.json();
       setResidents(prev => [...prev, added]);
-      const buildingsRes = await fetch(`${API_URL}/buildings`);
+      const buildingsRes = await authFetch(`${API_URL}/buildings`);
       if (buildingsRes.ok) {
         const buildingsData = await buildingsRes.json();
         setBuildings(buildingsData);
@@ -94,15 +164,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addStudent = async (data: any) => {
-    const res = await fetch(`${API_URL}/students`, {
+    const res = await authFetch(`${API_URL}/students`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (res.ok) {
       const added = await res.json();
       setStudents(prev => [...prev, added]);
-      const buildingsRes = await fetch(`${API_URL}/buildings`);
+      const buildingsRes = await authFetch(`${API_URL}/buildings`);
       if (buildingsRes.ok) {
         const buildingsData = await buildingsRes.json();
         setBuildings(buildingsData);
@@ -111,9 +180,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addBusiness = async (data: any) => {
-    const res = await fetch(`${API_URL}/businesses`, {
+    const res = await authFetch(`${API_URL}/businesses`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (res.ok) {
@@ -123,9 +191,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addBuilding = async (data: any) => {
-    const res = await fetch(`${API_URL}/buildings`, {
+    const res = await authFetch(`${API_URL}/buildings`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (res.ok) {
@@ -142,9 +209,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateResident = async (id: string, data: Partial<ResidentApartment>) => {
-    const res = await fetch(`${API_URL}/residents/${id}`, {
+    const res = await authFetch(`${API_URL}/residents/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (res.ok) {
@@ -154,9 +220,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const batchUpdateResidents = async (data: any[]) => {
-    const res = await fetch(`${API_URL}/residents/batch`, {
+    const res = await authFetch(`${API_URL}/residents/batch`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (res.ok) {
@@ -173,9 +238,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateStudent = async (id: string, data: Partial<StudentApartment>) => {
-    const res = await fetch(`${API_URL}/students/${id}`, {
+    const res = await authFetch(`${API_URL}/students/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (res.ok) {
@@ -185,9 +249,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const batchUpdateStudents = async (data: any[]) => {
-    const res = await fetch(`${API_URL}/students/batch`, {
+    const res = await authFetch(`${API_URL}/students/batch`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (res.ok) {
@@ -204,9 +267,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateBusiness = async (id: string, data: Partial<Business>) => {
-    const res = await fetch(`${API_URL}/businesses/${id}`, {
+    const res = await authFetch(`${API_URL}/businesses/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (res.ok) {
@@ -216,38 +278,37 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const softDeleteResident = async (id: string) => {
-    const res = await fetch(`${API_URL}/residents/${id}`, { method: 'DELETE' });
+    const res = await authFetch(`${API_URL}/residents/${id}`, { method: 'DELETE' });
     if (res.ok) setResidents(prev => prev.filter(r => r.id !== id));
   };
 
   const softDeleteStudent = async (id: string) => {
-    const res = await fetch(`${API_URL}/students/${id}`, { method: 'DELETE' });
+    const res = await authFetch(`${API_URL}/students/${id}`, { method: 'DELETE' });
     if (res.ok) setStudents(prev => prev.filter(s => s.id !== id));
   };
 
   const softDeleteBusiness = async (id: string) => {
-    const res = await fetch(`${API_URL}/businesses/${id}`, { method: 'DELETE' });
+    const res = await authFetch(`${API_URL}/businesses/${id}`, { method: 'DELETE' });
     if (res.ok) setBusinesses(prev => prev.filter(b => b.id !== id));
   };
 
   const splitResident = async (id: string) => {
-    const res = await fetch(`${API_URL}/residents/${id}/split`, { method: 'POST' });
+    const res = await authFetch(`${API_URL}/residents/${id}/split`, { method: 'POST' });
     if (res.ok) {
       const newApt = await res.json();
       setResidents(prev => {
         const targetIndex = prev.findIndex(r => r.id === id);
         if (targetIndex === -1) return prev;
         const copy = [...prev];
-        copy.splice(targetIndex + 0, 0, newApt);
+        copy.splice(targetIndex + 1, 0, newApt);
         return copy;
       });
     }
   };
 
   const addEmployee = async (data: any) => {
-    const res = await fetch(`${API_URL}/employees`, {
+    const res = await authFetch(`${API_URL}/employees`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (res.ok) {
@@ -257,9 +318,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateEmployee = async (id: string, data: any) => {
-    const res = await fetch(`${API_URL}/employees/${id}`, {
+    const res = await authFetch(`${API_URL}/employees/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (res.ok) {
@@ -269,14 +329,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const softDeleteEmployee = async (id: string) => {
-    const res = await fetch(`${API_URL}/employees/${id}`, { method: 'DELETE' });
+    const res = await authFetch(`${API_URL}/employees/${id}`, { method: 'DELETE' });
     if (res.ok) setEmployees(prev => prev.filter(e => e.id !== id));
   };
 
   const addExpense = async (data: any) => {
-    const res = await fetch(`${API_URL}/expenses`, {
+    const res = await authFetch(`${API_URL}/expenses`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (res.ok) {
@@ -286,9 +345,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateExpense = async (id: string, data: any) => {
-    const res = await fetch(`${API_URL}/expenses/${id}`, {
+    const res = await authFetch(`${API_URL}/expenses/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (res.ok) {
@@ -298,14 +356,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const softDeleteExpense = async (id: string) => {
-    const res = await fetch(`${API_URL}/expenses/${id}`, { method: 'DELETE' });
+    const res = await authFetch(`${API_URL}/expenses/${id}`, { method: 'DELETE' });
     if (res.ok) setExpenses(prev => prev.filter(e => e.id !== id));
   };
 
   const addMaintenanceIssue = async (data: any) => {
-    const res = await fetch(`${API_URL}/maintenance`, {
+    const res = await authFetch(`${API_URL}/maintenance`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (res.ok) {
@@ -315,7 +372,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const softDeleteMaintenanceIssue = async (id: string) => {
-    const res = await fetch(`${API_URL}/maintenance/${id}`, { method: 'DELETE' });
+    const res = await authFetch(`${API_URL}/maintenance/${id}`, { method: 'DELETE' });
     if (res.ok) setMaintenanceIssues(prev => prev.filter(m => m.id !== id));
   };
 
@@ -323,6 +380,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     <AppContext.Provider value={{
       role, setRole,
       residents, students, businesses, buildings, employees, expenses, maintenanceIssues,
+      token, user, login, logout, isAuthenticated: !!token,
       addResident, addStudent, addBusiness, addBuilding,
       updateResident, batchUpdateResidents, updateStudent, batchUpdateStudents, updateBusiness,
       softDeleteResident, softDeleteStudent, softDeleteBusiness,

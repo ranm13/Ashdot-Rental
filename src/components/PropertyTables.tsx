@@ -36,7 +36,7 @@ const PropertyTables: React.FC<Props> = ({ type }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const isEditor = role === 'Editor';
+  const isEditor = role === 'Admin';
 
   const getRawData = (): any[] => {
     switch (type) {

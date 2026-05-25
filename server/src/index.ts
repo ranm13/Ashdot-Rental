@@ -14,6 +14,265 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+import crypto from 'crypto';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'ashdot-super-secret-key-987654321';
+
+// Hash password with a deterministic SHA512 salt PBKDF2 method
+export function hashPassword(password: string): string {
+  return crypto.pbkdf2Sync(password, 'salt-ashdot-kibutz-project-1234', 1000, 64, 'sha512').toString('hex');
+}
+
+// Generate an RFC-compliant signed stateless JWT token using Node.js crypto
+export function generateToken(payload: any): string {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const payloadStr = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${payloadStr}`).digest('base64url');
+  return `${header}.${payloadStr}.${signature}`;
+}
+
+// Verify and decode a JWT token, return decoded payload or null
+export function verifyToken(token: string): any | null {
+  try {
+    const [header, payloadStr, signature] = token.split('.');
+    if (!header || !payloadStr || !signature) return null;
+    const expectedSignature = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${payloadStr}`).digest('base64url');
+    if (signature !== expectedSignature) return null;
+    const payload = JSON.parse(Buffer.from(payloadStr, 'base64url').toString('utf8'));
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+// Global Auth Middleware
+function authMiddleware(req: any, res: any, next: any) {
+  // 1. Bypass authorization for static assets (non-api routes)
+  if (!req.path.startsWith('/api')) {
+    return next();
+  }
+
+  // 2. Bypass authorization for public authentication/registration endpoints
+  if (
+    req.path === '/api/auth/login' ||
+    req.path === '/api/auth/register' ||
+    req.path.startsWith('/api/auth/invitation/')
+  ) {
+    return next();
+  }
+
+  // 3. Extract and verify token
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  const decoded = verifyToken(token);
+  if (!decoded) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
+  }
+
+  req.user = decoded;
+
+  // 4. Role Authorization Rule
+  // If the request tries to modify resources (POST, PUT, DELETE) and the role is not ADMIN, block it
+  if (['POST', 'PUT', 'DELETE'].includes(req.method) && decoded.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Forbidden: Admin access required for modifications' });
+  }
+
+  next();
+}
+
+app.use(authMiddleware);
+
+// --- AUTHENTICATION ENDPOINTS ---
+
+// Login endpoint
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { username } });
+    if (!user || user.password_hash !== hashPassword(password)) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    const token = generateToken({
+      id: user.id,
+      username: user.username,
+      role: user.role
+    });
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get invitation details (check validity)
+app.get('/api/auth/invitation/:token', async (req, res) => {
+  const { token } = req.params;
+  try {
+    const invite = await prisma.invitation.findUnique({ where: { token } });
+    if (!invite || invite.used || new Date(invite.expiresAt) < new Date()) {
+      return res.status(400).json({ valid: false, error: 'Invitation link is invalid or has expired' });
+    }
+    res.json({ valid: true, role: invite.role });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Register endpoint using invitation token
+app.post('/api/auth/register', async (req, res) => {
+  const { token, username, password } = req.body;
+  if (!token || !username || !password) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  try {
+    // 1. Verify invitation token
+    const invite = await prisma.invitation.findUnique({ where: { token } });
+    if (!invite || invite.used || new Date(invite.expiresAt) < new Date()) {
+      return res.status(400).json({ error: 'Invitation link is invalid or has expired' });
+    }
+
+    // 2. Check if username exists
+    const existingUser = await prisma.user.findUnique({ where: { username } });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Username is already taken' });
+    }
+
+    // 3. Create user and mark invitation as used in transaction
+    const newUser = await prisma.$transaction([
+      prisma.user.create({
+        data: {
+          username,
+          password_hash: hashPassword(password),
+          role: invite.role
+        }
+      }),
+      prisma.invitation.update({
+        where: { id: invite.id },
+        data: { used: true }
+      })
+    ]);
+
+    res.json({ success: true, user: { username: newUser[0].username, role: newUser[0].role } });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin generate registration invitation link
+app.post('/api/auth/invitation', async (req, res) => {
+  const { role } = req.body;
+  if (!role || !['ADMIN', 'READ_ONLY'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid or missing role' });
+  }
+
+  try {
+    const token = crypto.randomBytes(24).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24); // Expires in 24 hours
+
+    const invite = await prisma.invitation.create({
+      data: {
+        token,
+        role,
+        expiresAt
+      }
+    });
+
+    res.json(invite);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin view all users
+app.get('/api/auth/users', async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: { id: true, username: true, role: true }
+    });
+    res.json(users);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin delete a user (Admins cannot delete themselves)
+app.delete('/api/auth/users/:id', async (req, res) => {
+  const { id } = req.params;
+  const loggedInUserId = req.user.id;
+
+  if (id === loggedInUserId) {
+    return res.status(400).json({ error: 'You cannot delete your own account' });
+  }
+
+  try {
+    await prisma.user.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin view all invitations
+app.get('/api/auth/invitations', async (req, res) => {
+  try {
+    const invites = await prisma.invitation.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(invites);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin revoke/delete an invitation
+app.delete('/api/auth/invitations/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await prisma.invitation.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+async function seedDefaultAdmin() {
+  try {
+    const userCount = await prisma.user.count();
+    if (userCount === 0) {
+      console.log('Seeding initial default admin user...');
+      await prisma.user.create({
+        data: {
+          username: 'admin',
+          password_hash: hashPassword('admin'),
+          role: 'ADMIN'
+        }
+      });
+      console.log('Seeded default admin successfully! (admin / admin)');
+    }
+  } catch (err) {
+    console.error('Error seeding default admin:', err);
+  }
+}
+
+
 // Serve static assets from 'public' directory
 const publicPath = path.resolve(__dirname, '../public');
 app.use(express.static(publicPath));
@@ -416,5 +675,6 @@ app.get('*splat', (req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
   console.log(`Server listening on port ${PORT}`);
+  await seedDefaultAdmin();
   await seedDefaultExpenses();
 });

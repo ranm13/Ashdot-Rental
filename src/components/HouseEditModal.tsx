@@ -11,7 +11,7 @@ interface HouseEditModalProps {
 const HouseEditModal: React.FC<HouseEditModalProps> = ({ buildingId, onClose }) => {
   const { residents, batchUpdateResidents, role } = useAppContext();
   const [apartments, setApartments] = useState<ResidentApartment[]>([]);
-  const isEditor = role === 'Editor';
+  const isEditor = role === 'Admin';
 
   useEffect(() => {
     // Get all active apartments for this building

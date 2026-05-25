@@ -5,18 +5,21 @@ import GlobalDashboard from './components/GlobalDashboard';
 import PropertyTables from './components/PropertyTables';
 import PropertyMap from './components/PropertyMap';
 import Paychecks from './components/Paychecks';
-import { Shield, ShieldAlert } from 'lucide-react';
+import AuthScreen from './components/AuthScreen';
+import UsersManage from './components/UsersManage';
+import { LogOut } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
-  const { role, setRole } = useAppContext();
+  const { role, isAuthenticated, user, logout } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const activeTab = location.pathname.substring(1) || 'res';
+  // If not authenticated, force AuthScreen (handles both login & register based on URL token)
+  if (!isAuthenticated) {
+    return <AuthScreen />;
+  }
 
-  const toggleRole = () => {
-    setRole(role === 'Editor' ? 'Viewer' : 'Editor');
-  };
+  const activeTab = location.pathname.substring(1) || 'res';
 
   return (
     <div id="app">
@@ -44,25 +47,53 @@ const MainLayout: React.FC = () => {
           <button className={`nb ${activeTab === 'pay' ? 'on' : ''}`} onClick={() => navigate('/pay')}>
             💰 משכורות
           </button>
+          {/* Admin User Management Tab */}
+          {role === 'Admin' && (
+            <button className={`nb ${activeTab === 'users' ? 'on' : ''}`} onClick={() => navigate('/users')}>
+              🛡️ ניהול משתמשים
+            </button>
+          )}
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 10px' }}>
+        {/* User profile & Logout button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#94a3b8' }}>
+            <span style={{ fontWeight: 'bold', color: '#f1f5f9' }}>{user?.username}</span>
+            <span style={{
+              padding: '2px 6px',
+              borderRadius: '4px',
+              fontSize: '9px',
+              fontWeight: 'bold',
+              background: role === 'Admin' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+              color: role === 'Admin' ? '#fca5a5' : '#93c5fd',
+              border: role === 'Admin' ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(59, 130, 246, 0.2)'
+            }}>
+              {role === 'Admin' ? 'מנהל' : 'צופה'}
+            </span>
+          </div>
+          
           <button 
-            onClick={toggleRole}
+            onClick={logout}
             style={{ 
               background: 'transparent', 
               border: 'none', 
-              color: role === 'Editor' ? '#ef4444' : '#3b82f6', 
+              color: '#94a3b8', 
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
               fontSize: '11px',
-              fontWeight: 'bold'
+              fontWeight: 'bold',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              transition: 'background 0.2s'
             }}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#1e293b'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            title="התנתק מהמערכת"
           >
-            {role === 'Editor' ? <ShieldAlert size={14} /> : <Shield size={14} />}
-            {role === 'Editor' ? 'עורך (Editor)' : 'צופה (Viewer)'}
+            <LogOut size={13} color="#ef4444" />
+            <span style={{ color: '#ef4444' }}>התנתק</span>
           </button>
         </div>
       </div>
@@ -76,6 +107,8 @@ const MainLayout: React.FC = () => {
           <Route path="/biz" element={<PropertyTables type="Business" />} />
           <Route path="/map" element={<PropertyMap />} />
           <Route path="/pay" element={<Paychecks />} />
+          {/* Admin User Management Route */}
+          {role === 'Admin' && <Route path="/users" element={<UsersManage />} />}
           <Route path="*" element={<Navigate to="/res" replace />} />
         </Routes>
       </div>

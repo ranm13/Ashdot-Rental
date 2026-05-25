@@ -13,7 +13,7 @@ const GlobalDashboard: React.FC = () => {
   const [editForm, setEditForm] = useState<any>({});
   const [isAdding, setIsAdding] = useState(false);
 
-  const isEditor = role === 'Editor';
+  const isEditor = role === 'Admin';
 
   // --- Calculations for Resident Apartments ---
   const totalResUnits = residents.length;

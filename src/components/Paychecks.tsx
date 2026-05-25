@@ -14,7 +14,7 @@ export default function Paychecks() {
     notes: ''
   });
 
-  const isEditor = role === 'Editor';
+  const isEditor = role === 'Admin';
   const totalEmployees = employees.length;
   const totalSalaries = employees.reduce((acc, emp) => acc + (emp.salary || 0), 0);
 

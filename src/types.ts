@@ -1,4 +1,4 @@
-export type Role = 'Editor' | 'Viewer';
+export type Role = 'Admin' | 'Read-Only';
 
 export interface BaseEntity {
   id: string;

@@ -117,3 +117,12 @@ model MaintenanceIssue {
   category    String   @default("external") // "external" (חיצוני) or "internal" (פנימי)
   is_active   Boolean  @default(true)
 }
+
+model Invitation {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  role      String   // "ADMIN" or "READ_ONLY"
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

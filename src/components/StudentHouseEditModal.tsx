@@ -11,7 +11,7 @@ interface StudentHouseEditModalProps {
 const StudentHouseEditModal: React.FC<StudentHouseEditModalProps> = ({ buildingId, onClose }) => {
   const { students, batchUpdateStudents, role } = useAppContext();
   const [apartments, setApartments] = useState<StudentApartment[]>([]);
-  const isEditor = role === 'Editor';
+  const isEditor = role === 'Admin';
 
   useEffect(() => {
     // Get all active student apartments for this building

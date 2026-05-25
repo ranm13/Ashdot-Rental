@@ -30,7 +30,7 @@ const PropertyMap: React.FC = () => {
   const [selectedHouse, setSelectedHouse] = useState<string>('');
   const [customHouse, setCustomHouse] = useState<string>('');
 
-  const isEditor = role === 'Editor';
+  const isEditor = role === 'Admin';
 
   // The original image was 1200x859
   const iw = 1200;
