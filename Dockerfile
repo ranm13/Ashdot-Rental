@@ -24,7 +24,7 @@ RUN npx prisma generate
 # Stage 3: Monolithic Production Runner
 # ==========================================
 FROM node:20-alpine
-RUN apk add --no-cache openssl sqlite
+RUN apk add --no-cache openssl
 
 WORKDIR /app/server
 
@@ -38,19 +38,15 @@ COPY server/tsconfig.json ./
 # Inject frontend static assets into the backend static serving folder
 COPY --from=frontend-builder /app/dist ./public
 
-# Setup persistent volume mount folder
-RUN mkdir -p /data
-
 # Write container startup entrypoint hook script
 RUN echo '#!/bin/sh' > ./entrypoint.sh && \
-    echo 'echo "Executing production database migrations..."' >> ./entrypoint.sh && \
-    echo 'npx prisma migrate deploy' >> ./entrypoint.sh && \
+    echo 'echo "Synchronizing PostgreSQL database schema..."' >> ./entrypoint.sh && \
+    echo 'npx prisma db push --accept-data-loss' >> ./entrypoint.sh && \
     echo 'echo "Starting Express monolithic application server..."' >> ./entrypoint.sh && \
     echo 'exec npm start' >> ./entrypoint.sh && \
     chmod +x ./entrypoint.sh
 
 # Environment settings
-ENV DATABASE_URL="file:/data/production.db"
 ENV PORT=3000
 
 EXPOSE 3000

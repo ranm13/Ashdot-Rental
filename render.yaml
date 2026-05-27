@@ -2,16 +2,12 @@ services:
   - type: web
     name: ashdot-rental
     runtime: docker
-    plan: starter # Starter plan is required for Persistent Disks on Render
-    disk:
-      name: sqlite-data
-      mountPath: /data
-      sizeGB: 1
+    plan: free # Render Free tier (100% free hosting, no credit card required)
     envVars:
       - key: DATABASE_URL
-        value: file:/data/production.db
+        sync: false # The user will paste their Supabase connection string in the Render Dashboard
       - key: JWT_SECRET
-        generateValue: true
+        generateValue: true # Render will automatically generate a secure JWT secret
       - key: SMTP_HOST
         value: ""
       - key: SMTP_PORT
