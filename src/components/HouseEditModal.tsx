@@ -9,9 +9,12 @@ interface HouseEditModalProps {
 }
 
 const HouseEditModal: React.FC<HouseEditModalProps> = ({ buildingId, onClose }) => {
-  const { residents, batchUpdateResidents, role } = useAppContext();
+  const { residents, batchUpdateResidents, role, buildings, updateBuilding } = useAppContext();
   const [apartments, setApartments] = useState<ResidentApartment[]>([]);
   const isEditor = role === 'Admin';
+  
+  const buildingObj = buildings.find(b => b.id === buildingId);
+  const [physicalUnits, setPhysicalUnits] = useState(buildingObj?.units_per_building || 4);
 
   useEffect(() => {
     // Get all active apartments for this building
@@ -20,6 +23,12 @@ const HouseEditModal: React.FC<HouseEditModalProps> = ({ buildingId, onClose }) 
     const sorted = [...filtered].sort((a, b) => a.apartment_name.localeCompare(b.apartment_name));
     setApartments(sorted);
   }, [buildingId, residents]);
+
+  useEffect(() => {
+    if (buildingObj) {
+      setPhysicalUnits(buildingObj.units_per_building);
+    }
+  }, [buildingObj]);
 
   const handleChange = (id: string, field: keyof ResidentApartment, value: any) => {
     setApartments(prev => prev.map(apt => {
@@ -33,6 +42,9 @@ const HouseEditModal: React.FC<HouseEditModalProps> = ({ buildingId, onClose }) 
   const handleSave = async () => {
     if (!isEditor) return;
     await batchUpdateResidents(apartments);
+    if (buildingObj && Number(physicalUnits) !== buildingObj.units_per_building) {
+      await updateBuilding(buildingId, Number(physicalUnits));
+    }
     onClose();
   };
 
@@ -75,32 +87,52 @@ const HouseEditModal: React.FC<HouseEditModalProps> = ({ buildingId, onClose }) 
         </div>
 
         {/* Modal Body */}
-        <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: '#94a3b8' }}>מספר דירות:</span>
-            <input 
-              type="text" 
-              readOnly 
-              value={apartments.length} 
-              style={{
-                width: '60px', backgroundColor: '#1e293b', border: '1px solid #334155',
-                color: '#a78bfa', borderRadius: '4px', textAlign: 'center', padding: '4px'
-              }} 
-            />
+        <div style={{ padding: '20px', overflowY: 'auto', flex: 1, direction: 'rtl' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px', alignItems: 'center', gap: '15px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#94a3b8' }}>דירות רשומות במערכת:</span>
+              <input 
+                type="text" 
+                readOnly 
+                value={apartments.length} 
+                style={{
+                  width: '60px', backgroundColor: '#1e293b', border: '1px solid #334155',
+                  color: '#a78bfa', borderRadius: '4px', textAlign: 'center', padding: '4px'
+                }} 
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#94a3b8' }}>דירות בבניין (פיזית) *:</span>
+              <input 
+                type="number" 
+                value={physicalUnits} 
+                onChange={e => setPhysicalUnits(Number(e.target.value))}
+                disabled={!isEditor}
+                style={{
+                  width: '60px', backgroundColor: '#1e293b', border: '1px solid #334155',
+                  color: '#3b82f6', borderRadius: '4px', textAlign: 'center', padding: '4px',
+                  fontWeight: 'bold'
+                }} 
+              />
+            </div>
           </div>
 
           <div style={{ overflowX: 'auto' }}>
-            <table className="at" style={{ width: '100%', minWidth: '1000px', borderCollapse: 'collapse' }}>
+            <table className="at" style={{ width: '100%', minWidth: '1400px', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <th style={{ width: '40px', textAlign: 'center' }}>#</th>
                   <th>דירה</th>
                   <th>קומה</th>
-                  <th>דייר</th>
-                  <th>בעלים</th>
+                  <th style={{ width: '250px' }}>פרטי דייר (שם, טלפון, מייל)</th>
+                  <th>בעלי הדירה</th>
+                  <th>סוג בעלות</th>
+                  <th>סטטוס שיוך</th>
                   <th>מ"ר</th>
                   <th>שכ"ד</th>
-                  <th>מונים</th>
+                  <th>למי משלמים</th>
+                  <th>מונים (W/E)</th>
+                  <th>ארנונה</th>
                   <th>סיום חוזה</th>
                 </tr>
               </thead>
@@ -129,14 +161,35 @@ const HouseEditModal: React.FC<HouseEditModalProps> = ({ buildingId, onClose }) 
                       />
                     </td>
                     <td>
-                      <input 
-                        type="text" 
-                        value={apt.tenant_name || ''} 
-                        onChange={e => handleChange(apt.id, 'tenant_name', e.target.value)}
-                        className="apt-in"
-                        disabled={!isEditor}
-                        style={{ width: '100%' }}
-                      />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <input 
+                          type="text" 
+                          value={apt.tenant_name || ''} 
+                          placeholder="שם דייר"
+                          onChange={e => handleChange(apt.id, 'tenant_name', e.target.value)}
+                          className="apt-in"
+                          disabled={!isEditor}
+                          style={{ width: '100%', fontSize: '13px' }}
+                        />
+                        <input 
+                          type="text" 
+                          value={apt.phone || ''} 
+                          placeholder="טלפון"
+                          onChange={e => handleChange(apt.id, 'phone', e.target.value)}
+                          className="apt-in"
+                          disabled={!isEditor}
+                          style={{ width: '100%', fontSize: '12px', padding: '2px 6px' }}
+                        />
+                        <input 
+                          type="email" 
+                          value={apt.email || ''} 
+                          placeholder="אימייל"
+                          onChange={e => handleChange(apt.id, 'email', e.target.value)}
+                          className="apt-in"
+                          disabled={!isEditor}
+                          style={{ width: '100%', fontSize: '12px', padding: '2px 6px' }}
+                        />
+                      </div>
                     </td>
                     <td>
                       <input 
@@ -147,6 +200,33 @@ const HouseEditModal: React.FC<HouseEditModalProps> = ({ buildingId, onClose }) 
                         disabled={!isEditor}
                         style={{ width: '100%' }}
                       />
+                    </td>
+                    <td>
+                      <select
+                        value={apt.owner_type || 'קיבוץ'}
+                        onChange={e => handleChange(apt.id, 'owner_type', e.target.value)}
+                        disabled={!isEditor}
+                        className="apt-in"
+                        style={{ width: '100%', padding: '6px', background: '#0f172a' }}
+                      >
+                        <option value="קיבוץ">קיבוץ</option>
+                        <option value="חבר משק">חבר משק</option>
+                        <option value="יורשים">יורשים</option>
+                        <option value="בעלות מעורבת">בעלות מעורבת</option>
+                      </select>
+                    </td>
+                    <td>
+                      <select
+                        value={apt.allocation_status || 'לא משויך'}
+                        onChange={e => handleChange(apt.id, 'allocation_status', e.target.value)}
+                        disabled={!isEditor}
+                        className="apt-in"
+                        style={{ width: '100%', padding: '6px', background: '#0f172a' }}
+                      >
+                        <option value="לא משויך">לא משויך</option>
+                        <option value="משויך">משויך</option>
+                        <option value="בפוטנציאל לשיוך / שיווק לנקלטים">בפוטנציאל לשיוך</option>
+                      </select>
                     </td>
                     <td>
                       <input 
@@ -169,6 +249,19 @@ const HouseEditModal: React.FC<HouseEditModalProps> = ({ buildingId, onClose }) 
                         disabled={!isEditor}
                         style={{ width: '100%', color: '#22c55e', fontWeight: 'bold' }}
                       />
+                    </td>
+                    <td>
+                      <select
+                        value={apt.payment_dest || 'קיבוץ'}
+                        onChange={e => handleChange(apt.id, 'payment_dest', e.target.value)}
+                        disabled={!isEditor}
+                        className="apt-in"
+                        style={{ width: '100%', padding: '6px', background: '#0f172a' }}
+                      >
+                        <option value="קיבוץ">קיבוץ</option>
+                        <option value="יורשים בניהול הקיבוץ">יורשים בניהול</option>
+                        <option value="ישירות ליורשים">ישירות ליורשים</option>
+                      </select>
                     </td>
                     <td>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -197,6 +290,17 @@ const HouseEditModal: React.FC<HouseEditModalProps> = ({ buildingId, onClose }) 
                           />
                         </div>
                       </div>
+                    </td>
+                    <td>
+                      <input 
+                        type="text" 
+                        value={apt.arnona_id || ''} 
+                        onChange={e => handleChange(apt.id, 'arnona_id', e.target.value)}
+                        className="apt-in"
+                        disabled={!isEditor}
+                        placeholder="ארנונה"
+                        style={{ width: '100%' }}
+                      />
                     </td>
                     <td>
                       <input 

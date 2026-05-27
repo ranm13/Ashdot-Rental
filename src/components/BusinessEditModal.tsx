@@ -231,16 +231,16 @@ const BusinessEditModal: React.FC<BusinessEditModalProps> = ({ business, onClose
 
             {/* Row 6 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ color: '#64748b', fontSize: '13px', fontWeight: '500' }}>מ. חשמל</label>
-              <input
-                type="text"
+              <label style={{ color: '#64748b', fontSize: '13px', fontWeight: '500' }}>תחזוקה נדרשת</label>
+              <textarea
                 value={form.maintenance_log || ''}
                 onChange={e => handleChange('maintenance_log', e.target.value)}
                 disabled={!isEditor}
+                rows={2}
                 style={{
                   backgroundColor: '#0f172a', border: '1px solid #1e293b',
                   color: '#fff', borderRadius: '6px', padding: '10px 14px', fontSize: '14px',
-                  outline: 'none'
+                  outline: 'none', resize: 'vertical'
                 }}
               />
             </div>

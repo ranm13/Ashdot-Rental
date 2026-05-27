@@ -10,6 +10,7 @@ const UsersManage: React.FC = () => {
   const [invites, setInvites] = useState<any[]>([]);
   
   // Invite form state
+  const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'ADMIN' | 'READ_ONLY'>('READ_ONLY');
   const [generatedLink, setGeneratedLink] = useState('');
   const [copied, setCopied] = useState(false);
@@ -57,6 +58,11 @@ const UsersManage: React.FC = () => {
     setGeneratedLink('');
     setCopied(false);
 
+    if (!inviteEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail)) {
+      setError('נא להזין כתובת אימייל תקינה');
+      return;
+    }
+
     try {
       const res = await fetch(`${API_URL}/auth/invitation`, {
         method: 'POST',
@@ -64,7 +70,7 @@ const UsersManage: React.FC = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ role: inviteRole })
+        body: JSON.stringify({ role: inviteRole, email: inviteEmail })
       });
       const data = await res.json();
       if (res.ok) {
@@ -72,7 +78,8 @@ const UsersManage: React.FC = () => {
         const base = window.location.origin;
         const link = `${base}/register?token=${data.token}`;
         setGeneratedLink(link);
-        setSuccess('הזמנה נוצרה בהצלחה!');
+        setSuccess(`הזמנה נשלחה בהצלחה לאימייל: ${inviteEmail}`);
+        setInviteEmail(''); // Clear email field on success
         // Refresh invites list
         fetchUsersAndInvites();
       } else {
@@ -161,10 +168,10 @@ const UsersManage: React.FC = () => {
       }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#f8fafc', margin: 0 }}>
-            🛡️ ניהול משתמשים והזמנות
+            🛡️ ניהול משתמשים והזמנות אימייל
           </h1>
           <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
-            ניהול המורשים למערכת, מחיקת משתמשים ויצירת קישורי הרשמה מאובטחים.
+            ניהול המורשים למערכת, מחיקת משתמשים ושליחת הזמנות הרשמה ייחודיות ונעולות לאימייל.
           </p>
         </div>
         <button
@@ -229,7 +236,7 @@ const UsersManage: React.FC = () => {
       {/* GRID LAYOUT */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '1fr 1.2fr',
+        gridTemplateColumns: '1.2fr 1fr',
         gap: '24px',
         flex: 1
       }}>
@@ -252,6 +259,7 @@ const UsersManage: React.FC = () => {
               <thead>
                 <tr style={{ borderBottom: '1px solid #1e293b', textAlign: 'right' }}>
                   <th style={{ padding: '10px 8px', color: '#64748b' }}>שם משתמש</th>
+                  <th style={{ padding: '10px 8px', color: '#64748b' }}>אימייל</th>
                   <th style={{ padding: '10px 8px', color: '#64748b' }}>תפקיד</th>
                   <th style={{ padding: '10px 8px', color: '#64748b', textAlign: 'center' }}>פעולות</th>
                 </tr>
@@ -261,6 +269,9 @@ const UsersManage: React.FC = () => {
                   <tr key={u.id} style={{ borderBottom: '1px solid #1e293b' }}>
                     <td style={{ padding: '12px 8px', fontWeight: 'bold', color: '#f8fafc' }}>
                       {u.username} {u.id === currentUser?.id && <span style={{ fontSize: '10px', color: '#10b981', fontStyle: 'italic' }}>(אתה)</span>}
+                    </td>
+                    <td style={{ padding: '12px 8px', color: '#94a3b8' }}>
+                      {u.email || <span style={{ fontStyle: 'italic', color: '#475569' }}>ללא אימייל (סיד)</span>}
                     </td>
                     <td style={{ padding: '12px 8px' }}>
                       <span style={{
@@ -309,10 +320,32 @@ const UsersManage: React.FC = () => {
           }}>
             <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#f1f5f9', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Key size={18} color="#a78bfa" />
-              צור הזמנת הרשמה חדשה
+              שלח הזמנה חדשה לאימייל
             </h2>
 
             <form onSubmit={handleGenerateInvite} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>כתובת אימייל להזמנה:</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="name@example.com"
+                  value={inviteEmail}
+                  onChange={e => setInviteEmail(e.target.value)}
+                  style={{
+                    width: '100%',
+                    background: '#0a0f1e',
+                    border: '1px solid #334155',
+                    borderRadius: '8px',
+                    color: '#f8fafc',
+                    padding: '10px 12px',
+                    fontSize: '13px',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
               <div>
                 <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>תפקיד המשתמש החדש:</label>
                 <select
@@ -353,7 +386,7 @@ const UsersManage: React.FC = () => {
                 }}
               >
                 <Plus size={16} />
-                צור קישור הרשמה
+                שלח הזמנה לאימייל ✉️
               </button>
             </form>
 
@@ -366,7 +399,7 @@ const UsersManage: React.FC = () => {
                 padding: '12px'
               }}>
                 <div style={{ fontSize: '11px', color: '#10b981', fontWeight: 'bold', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Link size={12} /> הקישור הבא בתוקף ל-24 שעות הקרובות בלבד:
+                  <Link size={12} /> קישור הרשמה מועתק (לגיבוי/בדיקה):
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input
@@ -421,13 +454,13 @@ const UsersManage: React.FC = () => {
           }}>
             <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#f1f5f9', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Link size={18} color="#10b981" />
-              הזמנות פתוחות שלא מומשו ({invites.filter(i => !i.used).length})
+              הזמנות אימייל שלא מומשו ({invites.filter(i => !i.used).length})
             </h2>
             <div style={{ flex: 1, overflowY: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #1e293b', textAlign: 'right' }}>
-                    <th style={{ padding: '8px 4px', color: '#64748b' }}>קוד / טוקן</th>
+                    <th style={{ padding: '8px 4px', color: '#64748b' }}>כתובת אימייל</th>
                     <th style={{ padding: '8px 4px', color: '#64748b' }}>תפקיד מיועד</th>
                     <th style={{ padding: '8px 4px', color: '#64748b' }}>תוקף</th>
                     <th style={{ padding: '8px 4px', color: '#64748b' }}>סטטוס</th>
@@ -439,10 +472,10 @@ const UsersManage: React.FC = () => {
                     const isExpired = new Date(i.expiresAt) < new Date();
                     return (
                       <tr key={i.id} style={{ borderBottom: '1px solid #1e293b', opacity: (i.used || isExpired) ? 0.45 : 1 }}>
-                        <td style={{ padding: '10px 4px', fontFamily: 'monospace', color: '#a78bfa', fontSize: '10px', direction: 'ltr', textAlign: 'right' }}>
-                          {i.token.substring(0, 10)}...
+                        <td style={{ padding: '10px 4px', color: '#f8fafc', fontWeight: 'bold' }}>
+                          {i.email}
                         </td>
-                        <td style={{ padding: '10px 4px', fontWeight: 'bold' }}>
+                        <td style={{ padding: '10px 4px' }}>
                           {i.role === 'ADMIN' ? 'מנהל (Admin)' : 'צופה (Read-Only)'}
                         </td>
                         <td style={{ padding: '10px 4px', color: '#94a3b8' }}>

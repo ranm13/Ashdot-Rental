@@ -45,6 +45,62 @@ export function verifyToken(token: string): any | null {
   }
 }
 
+import nodemailer from 'nodemailer';
+
+// Configure SMTP transport using environment variables or fallback to a mock logger
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || '',
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+  },
+});
+
+export async function sendInvitationEmail(email: string, token: string, role: string) {
+  const registerUrl = `http://localhost:8080/register?token=${token}`;
+  const roleText = role === 'ADMIN' ? 'מנהל מערכת (Admin)' : 'צופה בלבד (Read-Only)';
+  
+  const mailOptions = {
+    from: process.env.SMTP_FROM || '"מערכת אשדות" <noreply@ashdot.co.il>',
+    to: email,
+    subject: 'הזמנה להצטרפות למערכת אשדות',
+    html: `
+      <div style="direction: rtl; text-align: right; font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <h2 style="color: #2563eb;">הוזמנת להצטרף למערכת אשדות!</h2>
+        <p>שלום,</p>
+        <p>מנהל המערכת הזמין אותך להירשם למערכת אשדות בתפקיד: <strong>${roleText}</strong>.</p>
+        <p>כתובת האימייל המאושרת להרשמה היא: <strong>${email}</strong>.</p>
+        <div style="margin: 30px 0; text-align: center;">
+          <a href="${registerUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">לחץ כאן להשלמת ההרשמה</a>
+        </div>
+        <p style="font-size: 12px; color: #64748b;">קישור זה בתוקף ל-24 שעות הקרובות בלבד והוא מיועד לשימוש חד-פעמי.</p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0;" />
+        <p style="font-size: 11px; color: #94a3b8;">אם הקישור אינו עובד, ניתן להעתיק את הכתובת הבאה לדפדפן: <br/> ${registerUrl}</p>
+      </div>
+    `,
+  };
+
+  // If SMTP_HOST is provided, attempt to send real email. Otherwise mock to console
+  if (process.env.SMTP_HOST) {
+    try {
+      await transporter.sendMail(mailOptions);
+      console.log(`✉️ Real email sent successfully to ${email}`);
+    } catch (err: any) {
+      console.error(`❌ Failed to send email to ${email}:`, err.message);
+    }
+  } else {
+    console.log(`\n======================================================`);
+    console.log(`✉️ MOCK EMAIL LOG (SMTP_HOST is not configured)`);
+    console.log(`To: ${email}`);
+    console.log(`Subject: ${mailOptions.subject}`);
+    console.log(`Invitation Role: ${role}`);
+    console.log(`Registration URL: ${registerUrl}`);
+    console.log(`======================================================\n`);
+  }
+}
+
 // Global Auth Middleware
 function authMiddleware(req: any, res: any, next: any) {
   // 1. Bypass authorization for static assets (non-api routes)
@@ -128,7 +184,7 @@ app.get('/api/auth/invitation/:token', async (req, res) => {
     if (!invite || invite.used || new Date(invite.expiresAt) < new Date()) {
       return res.status(400).json({ valid: false, error: 'Invitation link is invalid or has expired' });
     }
-    res.json({ valid: true, role: invite.role });
+    res.json({ valid: true, role: invite.role, email: invite.email });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -154,11 +210,18 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'Username is already taken' });
     }
 
-    // 3. Create user and mark invitation as used in transaction
+    // 3. Check if email is already registered
+    const existingEmail = await prisma.user.findUnique({ where: { email: invite.email } });
+    if (existingEmail) {
+      return res.status(400).json({ error: 'כתובת אימייל זו כבר רשומה במערכת' });
+    }
+
+    // 4. Create user and mark invitation as used in transaction
     const newUser = await prisma.$transaction([
       prisma.user.create({
         data: {
           username,
+          email: invite.email,
           password_hash: hashPassword(password),
           role: invite.role
         }
@@ -169,20 +232,29 @@ app.post('/api/auth/register', async (req, res) => {
       })
     ]);
 
-    res.json({ success: true, user: { username: newUser[0].username, role: newUser[0].role } });
+    res.json({ success: true, user: { username: newUser[0].username, email: newUser[0].email, role: newUser[0].role } });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Admin generate registration invitation link
+// Admin generate registration invitation link and send email
 app.post('/api/auth/invitation', async (req, res) => {
-  const { role } = req.body;
+  const { role, email } = req.body;
   if (!role || !['ADMIN', 'READ_ONLY'].includes(role)) {
     return res.status(400).json({ error: 'Invalid or missing role' });
   }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'כתובת אימייל לא תקינה או חסרה' });
+  }
 
   try {
+    // Check if a user with this email is already registered
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ error: 'משתמש עם כתובת אימייל זו כבר רשום במערכת' });
+    }
+
     const token = crypto.randomBytes(24).toString('hex');
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24); // Expires in 24 hours
@@ -190,10 +262,14 @@ app.post('/api/auth/invitation', async (req, res) => {
     const invite = await prisma.invitation.create({
       data: {
         token,
+        email,
         role,
         expiresAt
       }
     });
+
+    // Send the email
+    await sendInvitationEmail(email, token, role);
 
     res.json(invite);
   } catch (err: any) {
@@ -205,7 +281,7 @@ app.post('/api/auth/invitation', async (req, res) => {
 app.get('/api/auth/users', async (req, res) => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, username: true, role: true }
+      select: { id: true, username: true, email: true, role: true }
     });
     res.json(users);
   } catch (err: any) {
@@ -279,12 +355,15 @@ app.use(express.static(publicPath));
 
 // --- RESIDENTS ---
 app.get('/api/residents', async (req, res) => {
-  const data = await prisma.residentApartment.findMany({ where: { is_active: true } });
+  const data = await prisma.residentApartment.findMany({
+    where: { is_active: true },
+    include: { building: true }
+  });
   res.json(data);
 });
 
 app.post('/api/residents', async (req, res) => {
-  const { building_number, rent, square_meters, ...rest } = req.body;
+  const { building_number, units_per_building, rent, square_meters, ...rest } = req.body;
   const hNum = Number(building_number);
   
   let building = await prisma.building.findUnique({ where: { house_number: hNum } });
@@ -295,8 +374,13 @@ app.post('/api/residents', async (req, res) => {
         house_number: hNum,
         map_x: 0,
         map_y: 0,
-        units_per_building: 1
+        units_per_building: units_per_building ? Number(units_per_building) : 1
       }
+    });
+  } else if (units_per_building) {
+    building = await prisma.building.update({
+      where: { id: building.id },
+      data: { units_per_building: Number(units_per_building) }
     });
   }
 
@@ -307,7 +391,8 @@ app.post('/api/residents', async (req, res) => {
       rent: rent ? Number(rent) : null,
       square_meters: square_meters ? Number(square_meters) : 0,
       is_active: true
-    }
+    },
+    include: { building: true }
   });
   res.json(newApt);
 });
@@ -316,7 +401,8 @@ app.put('/api/residents/:id', async (req, res) => {
   const { id } = req.params;
   const data = await prisma.residentApartment.update({
     where: { id },
-    data: req.body
+    data: req.body,
+    include: { building: true }
   });
   res.json(data);
 });
@@ -325,7 +411,8 @@ app.delete('/api/residents/:id', async (req, res) => {
   const { id } = req.params;
   const data = await prisma.residentApartment.update({
     where: { id },
-    data: { is_active: false }
+    data: { is_active: false },
+    include: { building: true }
   });
   res.json(data);
 });
@@ -337,13 +424,14 @@ app.put('/api/residents/batch', async (req, res) => {
   try {
     const results = await Promise.all(
       apartments.map(apt => {
-        const { id, building_id, ...rest } = apt;
+        const { id, building_id, building, ...rest } = apt;
         const updateData = { ...rest };
         if (updateData.rent !== undefined) updateData.rent = updateData.rent === null ? null : Number(updateData.rent);
         if (updateData.square_meters !== undefined) updateData.square_meters = updateData.square_meters === null ? null : Number(updateData.square_meters);
         return prisma.residentApartment.update({
           where: { id },
-          data: updateData
+          data: updateData,
+          include: { building: true }
         });
       })
     );
@@ -374,9 +462,12 @@ app.post('/api/residents/:id/split', async (req, res) => {
       phone: target.phone,
       email: target.email,
       payment_dest: target.payment_dest,
+      owner_type: target.owner_type,
+      allocation_status: target.allocation_status,
       maintenance_log: target.maintenance_log,
       is_active: true
-    }
+    },
+    include: { building: true }
   });
   res.json(newApt);
 });
@@ -389,13 +480,14 @@ app.put('/api/students/batch', async (req, res) => {
   try {
     const results = await Promise.all(
       apartments.map(apt => {
-        const { id, building_id, ...rest } = apt;
+        const { id, building_id, building, ...rest } = apt;
         const updateData = { ...rest };
         if (updateData.rent !== undefined) updateData.rent = updateData.rent === null ? null : Number(updateData.rent);
         if (updateData.apartment_num !== undefined) updateData.apartment_num = Number(updateData.apartment_num);
         return prisma.studentApartment.update({
           where: { id },
-          data: updateData
+          data: updateData,
+          include: { building: true }
         });
       })
     );
@@ -407,12 +499,15 @@ app.put('/api/students/batch', async (req, res) => {
 });
 
 app.get('/api/students', async (req, res) => {
-  const data = await prisma.studentApartment.findMany({ where: { is_active: true } });
+  const data = await prisma.studentApartment.findMany({
+    where: { is_active: true },
+    include: { building: true }
+  });
   res.json(data);
 });
 
 app.post('/api/students', async (req, res) => {
-  const { building_number, rent, apartment_num, ...rest } = req.body;
+  const { building_number, units_per_building, rent, apartment_num, ...rest } = req.body;
   const hNum = Number(building_number);
 
   let building = await prisma.building.findUnique({ where: { house_number: hNum } });
@@ -423,8 +518,13 @@ app.post('/api/students', async (req, res) => {
         house_number: hNum,
         map_x: 0,
         map_y: 0,
-        units_per_building: 1
+        units_per_building: units_per_building ? Number(units_per_building) : 1
       }
+    });
+  } else if (units_per_building) {
+    building = await prisma.building.update({
+      where: { id: building.id },
+      data: { units_per_building: Number(units_per_building) }
     });
   }
 
@@ -435,7 +535,8 @@ app.post('/api/students', async (req, res) => {
       apartment_num: Number(apartment_num) || 1,
       rent: rent ? Number(rent) : null,
       is_active: true
-    }
+    },
+    include: { building: true }
   });
   res.json(newApt);
 });
@@ -444,7 +545,8 @@ app.put('/api/students/:id', async (req, res) => {
   const { id } = req.params;
   const data = await prisma.studentApartment.update({
     where: { id },
-    data: req.body
+    data: req.body,
+    include: { building: true }
   });
   res.json(data);
 });
@@ -453,7 +555,8 @@ app.delete('/api/students/:id', async (req, res) => {
   const { id } = req.params;
   const data = await prisma.studentApartment.update({
     where: { id },
-    data: { is_active: false }
+    data: { is_active: false },
+    include: { building: true }
   });
   res.json(data);
 });
@@ -575,6 +678,16 @@ app.post('/api/buildings', async (req, res) => {
     }
   });
   res.json(building);
+});
+
+app.put('/api/buildings/:id', async (req, res) => {
+  const { id } = req.params;
+  const { units_per_building } = req.body;
+  const data = await prisma.building.update({
+    where: { id },
+    data: { units_per_building: Number(units_per_building) }
+  });
+  res.json(data);
 });
 
 // --- MAINTENANCE ---

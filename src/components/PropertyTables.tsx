@@ -160,9 +160,16 @@ const PropertyTables: React.FC<Props> = ({ type }) => {
     if (type === 'Resident') return (
       <tr>
         <th>מס' בית</th>
+        <th>דירות בבית (פיזי)</th>
         <th>דירה</th>
-        <th>מאוכלס ע"י</th>
+        <th>מאוכלס ע"י (דייר, טלפון, מייל)</th>
+        <th>סוג בעלות</th>
+        <th>בעלי הדירה</th>
+        <th>סטטוס שיוך</th>
         <th>שכ"ד/ח</th>
+        <th>למי משלמים</th>
+        <th>ארנונה</th>
+        <th>מונים (W/E)</th>
         <th>תחזוקה</th>
         <th>סיום חוזה</th>
         <th>פעולות</th>
@@ -170,12 +177,31 @@ const PropertyTables: React.FC<Props> = ({ type }) => {
     );
     if (type === 'Student') return (
       <tr>
-        <th>בניין</th><th>דירה</th><th>שם דייר</th><th>שכ"ד</th><th>סיום חוזה</th><th>פעולות</th>
+        <th>בניין</th>
+        <th>דירות בבניין (פיזי)</th>
+        <th>דירה</th>
+        <th>שם דייר (טלפון, מייל)</th>
+        <th>שכ"ד</th>
+        <th>למי משלמים</th>
+        <th>ארנונה</th>
+        <th>מים (מונה)</th>
+        <th>סיום חוזה</th>
+        <th>פעולות</th>
       </tr>
     );
     if (type === 'Business') return (
       <tr>
-        <th>שם עסק</th><th>בעלים</th><th>מיקום</th><th>שכ"ד</th><th>מ"ר</th><th>ארנונה</th><th>סיום חוזה</th><th>הסדרת שימושים</th><th>פעולות</th>
+        <th>שם עסק</th>
+        <th>בעלים (טלפון, מייל)</th>
+        <th>מיקום</th>
+        <th>שכ"ד</th>
+        <th>מ"ר</th>
+        <th>ארנונה</th>
+        <th>מונה מים</th>
+        <th>תחזוקה נדרשת</th>
+        <th>סיום חוזה</th>
+        <th>הסדרת שימושים</th>
+        <th>פעולות</th>
       </tr>
     );
   };
@@ -187,16 +213,21 @@ const PropertyTables: React.FC<Props> = ({ type }) => {
       const openCalls = maintenanceIssues.filter(m => m.building_id === item.building_id && m.status !== 'טופל').length;
       return (
         <tr key={item.id}>
-          {/* Change color of data in building_id column to rgb(167, 139, 250) */}
           <td style={{ color: 'rgb(167, 139, 250)', fontWeight: 'bold' }}>{item.building_id}</td>
+          <td style={{ textAlign: 'center' }}>{item.building?.units_per_building || 4}</td>
           <td>{item.apartment_name}</td>
           <td>
             {item.tenant_name && item.tenant_name.trim() !== '' ? (
-              item.tenant_name
+              <div>
+                <div style={{ fontWeight: 'bold' }}>{item.tenant_name}</div>
+                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                  📞 {item.phone || '-'} | ✉ {item.email || '-'}
+                </div>
+              </div>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ color: '#f87171', fontStyle: 'italic', fontWeight: 'bold' }}>פנוי</span>
-                {item.owner_name === 'הקיבוץ' && (
+                {(item.allocation_status === 'בפוטנציאל לשיוך / שיווק לנקלטים' || item.owner_name === 'הקיבוץ') && (
                   <span style={{ 
                     backgroundColor: '#1e3a8a', 
                     color: '#93c5fd', 
@@ -205,74 +236,116 @@ const PropertyTables: React.FC<Props> = ({ type }) => {
                     borderRadius: '4px', 
                     fontWeight: 'bold' 
                   }}>
-                    בפוטנציאל לשיוך / שיווק לנקלטים
+                    בפוטנציאל לשיוך
                   </span>
                 )}
               </div>
             )}
           </td>
-          {/* Change color of rent to #22c55e */}
+          <td>
+            <span style={{
+              backgroundColor: item.owner_type === 'קיבוץ' ? 'rgba(37, 99, 235, 0.15)' : item.owner_type === 'יורשים' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+              color: item.owner_type === 'קיבוץ' ? '#60a5fa' : item.owner_type === 'יורשים' ? '#f87171' : '#34d399',
+              padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold'
+            }}>
+              {item.owner_type || 'קיבוץ'}
+            </span>
+          </td>
+          <td>{item.owner_name || '-'}</td>
+          <td>
+            <span style={{
+              backgroundColor: item.allocation_status === 'משויך' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(148, 163, 184, 0.15)',
+              color: item.allocation_status === 'משויך' ? '#34d399' : '#94a3b8',
+              padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold'
+            }}>
+              {item.allocation_status || 'לא משויך'}
+            </span>
+          </td>
           <td style={{ color: '#22c55e', fontWeight: 'bold' }}>
             {item.rent ? `₪${item.rent.toLocaleString()}` : '-'}
           </td>
+          <td>{item.payment_dest || 'קיבוץ'}</td>
+          <td>{item.arnona_id || '-'}</td>
+          <td>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px', color: '#94a3b8' }}>
+              <div>💧 W: {item.water_id || '-'}</div>
+              <div>⚡ E: {item.electricity_id || '-'}</div>
+            </div>
+          </td>
           <td style={{ color: openCalls > 0 ? '#f59e0b' : '#10b981' }}>
-            {openCalls > 0 ? `⚠️ ${openCalls} קריאות פתוחות` : '✅ תקין'}
+            {openCalls > 0 ? `⚠️ ${openCalls} פתוחות` : '✅ תקין'}
           </td>
           <td>{item.contract_end || '-'}</td>
           {renderActions(item, isEditing)}
         </tr>
       );
     }
-
+ 
     if (type === 'Student') return (
       <tr key={item.id}>
         <td style={{ color: '#a78bfa', fontWeight: 'bold' }}>{item.building_id}</td>
+        <td style={{ textAlign: 'center' }}>{item.building?.units_per_building || 4}</td>
         <td>{item.apartment_num}</td>
         <td>
           {isEditing ? (
             <input className="apt-in" value={editForm.tenant_name || ''} onChange={e => setEditForm({...editForm, tenant_name: e.target.value})} />
           ) : (
             item.tenant_name && item.tenant_name.trim() !== '' ? (
-              item.tenant_name
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ color: '#f87171', fontStyle: 'italic', fontWeight: 'bold' }}>פנוי</span>
-                {item.payment_dest === 'קיבוץ' && (
-                  <span style={{ 
-                    backgroundColor: '#581c87', 
-                    color: '#e9d5ff', 
-                    fontSize: '11px', 
-                    padding: '2px 8px', 
-                    borderRadius: '4px', 
-                    fontWeight: 'bold' 
-                  }}>
-                    בפוטנציאל לשיוך / שיווק לנקלטים
-                  </span>
-                )}
+              <div>
+                <div style={{ fontWeight: 'bold' }}>{item.tenant_name}</div>
+                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                  📞 {item.phone || '-'} | ✉ {item.email || '-'}
+                </div>
               </div>
+            ) : (
+              <span style={{ color: '#f87171', fontStyle: 'italic', fontWeight: 'bold' }}>פנוי</span>
             )
           )}
         </td>
         <td style={{ color: '#22c55e', fontWeight: 'bold' }}>
           {isEditing ? <input className="apt-in" type="number" value={editForm.rent || ''} onChange={e => setEditForm({...editForm, rent: e.target.value})} /> : (item.rent ? `₪${item.rent.toLocaleString()}` : '-')}
         </td>
+        <td>{item.payment_dest || 'קיבוץ'}</td>
+        <td>{item.arnona_id || '-'}</td>
+        <td>{item.water_id || '-'}</td>
         <td>{isEditing ? <input className="apt-in" type="date" value={editForm.contract_end || ''} onChange={e => setEditForm({...editForm, contract_end: e.target.value})} /> : item.contract_end}</td>
         {renderActions(item, isEditing)}
       </tr>
     );
-
+ 
     if (type === 'Business') return (
       <tr key={item.id}>
         <td>{item.business_name}</td>
-        <td>{item.owner_name}</td>
+        <td>
+          <div>
+            <div style={{ fontWeight: 'bold' }}>{item.owner_name}</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+              📞 {item.phone || '-'} | ✉ {item.email || '-'}
+            </div>
+          </div>
+        </td>
         <td>{item.location}</td>
         <td style={{ color: '#22c55e', fontWeight: 'bold' }}>
           {item.rent ? `₪${item.rent.toLocaleString()}` : '-'}
         </td>
         <td>{item.square_meters || '-'}</td>
         <td>{item.arnona_id || '-'}</td>
+        <td>{item.water_id || '-'}</td>
+        <td>
+          <div style={{ fontSize: '12px', color: '#e2e8f0', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.maintenance_log}>
+            {item.maintenance_log || '-'}
+          </div>
+        </td>
         <td>{item.contract_end || '-'}</td>
-        <td>{item.status}</td>
+        <td>
+          <span style={{
+            padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold',
+            backgroundColor: item.status === 'הוסדר' ? 'rgba(16, 185, 129, 0.15)' : item.status === 'בטיפול' ? 'rgba(37, 99, 235, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+            color: item.status === 'הוסדר' ? '#34d399' : item.status === 'בטיפול' ? '#60a5fa' : '#f87171'
+          }}>
+            {item.status}
+          </span>
+        </td>
         {renderActions(item, false)}
       </tr>
     );

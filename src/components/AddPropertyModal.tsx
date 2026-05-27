@@ -16,6 +16,8 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ type, onClose }) =>
     apartment_name: '',
     floor: '',
     owner_name: 'הקיבוץ',
+    owner_type: 'קיבוץ',
+    allocation_status: 'לא משויך',
     electricity_id: '',
     
     // Student specific
@@ -29,6 +31,7 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ type, onClose }) =>
     
     // Shared
     building_number: '',
+    units_per_building: '4', // Shared building has 4 by default
     tenant_name: '',
     rent: '',
     square_meters: '',
@@ -83,10 +86,13 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ type, onClose }) =>
       if (type === 'Resident') {
         const payload = {
           building_number: Number(formData.building_number),
+          units_per_building: Number(formData.units_per_building || 4),
           apartment_name: formData.apartment_name,
           floor: formData.floor,
           tenant_name: formData.tenant_name,
           owner_name: formData.owner_name,
+          owner_type: formData.owner_type,
+          allocation_status: formData.allocation_status,
           rent: formData.rent ? Number(formData.rent) : null,
           square_meters: formData.square_meters ? Number(formData.square_meters) : 0,
           arnona_id: formData.arnona_id,
@@ -102,6 +108,7 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ type, onClose }) =>
       } else if (type === 'Student') {
         const payload = {
           building_number: Number(formData.building_number),
+          units_per_building: Number(formData.units_per_building || 4),
           apartment_num: Number(formData.apartment_num),
           tenant_name: formData.tenant_name,
           rent: formData.rent ? Number(formData.rent) : null,
@@ -186,6 +193,17 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ type, onClose }) =>
                     placeholder="לדוגמא: 27"
                   />
                   {errors.building_number && <span style={{ color: '#ef4444', fontSize: '12px' }}>{errors.building_number}</span>}
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', color: '#94a3b8' }}>מספר דירות בבית (פיזי) *</label>
+                  <input
+                    type="number"
+                    value={formData.units_per_building}
+                    onChange={e => handleChange('units_per_building', e.target.value)}
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', background: '#1e293b', border: '1px solid #334155', color: '#fff' }}
+                    placeholder="בבית משותף יש בדרך כלל 4 או 8 דירות"
+                  />
                 </div>
 
                 {type === 'Resident' ? (
@@ -292,13 +310,41 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ type, onClose }) =>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', color: '#94a3b8' }}>בעלי הדירה</label>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', color: '#94a3b8' }}>שם בעלי הדירה (למשל, 4 בעלים בבית משותף)</label>
                   <input
                     type="text"
                     value={formData.owner_name}
                     onChange={e => handleChange('owner_name', e.target.value)}
                     style={{ width: '100%', padding: '10px', borderRadius: '6px', background: '#1e293b', border: '1px solid #334155', color: '#fff' }}
+                    placeholder="שמות הבעלים"
                   />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', color: '#94a3b8' }}>סוג בעלות</label>
+                  <select
+                    value={formData.owner_type}
+                    onChange={e => handleChange('owner_type', e.target.value)}
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', background: '#1e293b', border: '1px solid #334155', color: '#fff' }}
+                  >
+                    <option value="קיבוץ">קיבוץ</option>
+                    <option value="חבר משק">חבר משק</option>
+                    <option value="יורשים">יורשים</option>
+                    <option value="בעלות מעורבת">בעלות מעורבת (קיבוץ, יורשים, חברי משק)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', color: '#94a3b8' }}>סטטוס שיוך</label>
+                  <select
+                    value={formData.allocation_status}
+                    onChange={e => handleChange('allocation_status', e.target.value)}
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', background: '#1e293b', border: '1px solid #334155', color: '#fff' }}
+                  >
+                    <option value="לא משויך">לא משויך</option>
+                    <option value="משויך">משויך</option>
+                    <option value="בפוטנציאל לשיוך / שיווק לנקלטים">בפוטנציאל לשיוך / שיווק לנקלטים</option>
+                  </select>
                 </div>
               </>
             )}
@@ -390,15 +436,15 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ type, onClose }) =>
 
             {type !== 'Business' && (
               <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', color: '#94a3b8' }}>יעד תשלום / גורם משלם</label>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', color: '#94a3b8' }}>למי משלמים / גורם משלם</label>
                 <select
                   value={formData.payment_dest}
                   onChange={e => handleChange('payment_dest', e.target.value)}
                   style={{ width: '100%', padding: '10px', borderRadius: '6px', background: '#1e293b', border: '1px solid #334155', color: '#fff' }}
                 >
                   <option value="קיבוץ">קיבוץ</option>
-                  <option value="פרטי">פרטי</option>
-                  <option value="משוייך">משוייך</option>
+                  <option value="יורשים בניהול הקיבוץ">יורשים בניהול הקיבוץ</option>
+                  <option value="ישירות ליורשים">ישירות ליורשים</option>
                 </select>
               </div>
             )}

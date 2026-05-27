@@ -21,8 +21,14 @@ export interface ResidentApartment extends BaseEntity {
   phone: string; // Phone
   email: string; // Email
   payment_dest: string;
+  owner_type?: string;
+  allocation_status?: string;
   maintenance_log?: string; // Track maintenance as per requirements
   maintenance_cost?: number;
+  building?: {
+    house_number: number;
+    units_per_building: number;
+  };
 }
 
 export interface MaintenanceIssue extends BaseEntity {
@@ -49,6 +55,10 @@ export interface StudentApartment extends BaseEntity {
   payment_dest?: string; // 'קיבוץ' / 'יורשים בניהול הקיבוץ' / 'ישירות ליורשים'
   maintenance_log?: string;
   maintenance_cost?: number;
+  building?: {
+    house_number: number;
+    units_per_building: number;
+  };
 }
 
 export interface Business extends BaseEntity {

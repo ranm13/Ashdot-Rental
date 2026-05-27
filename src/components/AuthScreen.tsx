@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Lock, User, Key, Check, AlertCircle, ArrowRight, Shield } from 'lucide-react';
+import { Lock, User, Key, Check, AlertCircle, ArrowRight, Shield, Mail } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || (window.location.origin.includes('5173') ? 'http://localhost:3000/api' : '/api');
 
@@ -10,6 +10,7 @@ const AuthScreen: React.FC = () => {
   const [inviteToken, setInviteToken] = useState('');
   const [isValidToken, setIsValidToken] = useState<boolean | null>(null);
   const [tokenRole, setTokenRole] = useState('');
+  const [invitedEmail, setInvitedEmail] = useState('');
   const [tokenError, setTokenError] = useState('');
 
   // Form states
@@ -44,6 +45,7 @@ const AuthScreen: React.FC = () => {
       if (res.ok && data.valid) {
         setIsValidToken(true);
         setTokenRole(data.role);
+        setInvitedEmail(data.email);
       } else {
         setIsValidToken(false);
         setTokenError(data.error || 'הזמנה לא בתוקף או שלא נמצאה במערכת');
@@ -280,6 +282,35 @@ const AuthScreen: React.FC = () => {
               </div>
             )}
 
+            {/* LOCKED EMAIL FIELD FOR REGISTRATIONS */}
+            {isRegister && isValidToken && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '6px', fontWeight: 'bold' }}>
+                  כתובת אימייל מאושרת (נעולה)
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="email"
+                    disabled
+                    value={invitedEmail}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15, 23, 42, 0.65)',
+                      border: '1px solid #1e293b',
+                      borderRadius: '8px',
+                      color: '#94a3b8',
+                      fontSize: '13px',
+                      padding: '10px 12px 10px 36px',
+                      boxSizing: 'border-box',
+                      cursor: 'not-allowed',
+                      fontFamily: 'monospace'
+                    }}
+                  />
+                  <Mail size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#475569' }} />
+                </div>
+              </div>
+            )}
+
             {/* INPUT FIELDS */}
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '6px', fontWeight: 'bold' }}>
@@ -300,7 +331,7 @@ const AuthScreen: React.FC = () => {
                     padding: '10px 12px 10px 36px',
                     boxSizing: 'border-box'
                   }}
-                  placeholder="הזן שם משתמש"
+                  placeholder="בחר שם משתמש"
                   autoFocus
                 />
                 <User size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#64748b' }} />
@@ -326,7 +357,7 @@ const AuthScreen: React.FC = () => {
                     padding: '10px 12px 10px 36px',
                     boxSizing: 'border-box'
                   }}
-                  placeholder="הזן סיסמה"
+                  placeholder="בחר סיסמה"
                 />
                 <Lock size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#64748b' }} />
               </div>
@@ -352,7 +383,7 @@ const AuthScreen: React.FC = () => {
                       padding: '10px 12px 10px 36px',
                       boxSizing: 'border-box'
                     }}
-                    placeholder="הזן סיסמה שנית"
+                    placeholder="הקלד סיסמה שנית"
                   />
                   <Key size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#64748b' }} />
                 </div>

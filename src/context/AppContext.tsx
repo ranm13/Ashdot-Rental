@@ -21,6 +21,7 @@ interface AppContextType {
   addStudent: (data: any) => Promise<void>;
   addBusiness: (data: any) => Promise<void>;
   addBuilding: (data: any) => Promise<void>;
+  updateBuilding: (id: string, units_per_building: number) => Promise<void>;
   updateResident: (id: string, data: Partial<ResidentApartment>) => Promise<void>;
   batchUpdateResidents: (data: any[]) => Promise<void>;
   updateStudent: (id: string, data: Partial<StudentApartment>) => Promise<void>;
@@ -208,6 +209,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const updateBuilding = async (id: string, units_per_building: number) => {
+    const res = await authFetch(`${API_URL}/buildings/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ units_per_building })
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setBuildings(prev => prev.map(b => b.id === id ? updated : b));
+      const residentsRes = await authFetch(`${API_URL}/residents`);
+      if (residentsRes.ok) setResidents(await residentsRes.json());
+      const studentsRes = await authFetch(`${API_URL}/students`);
+      if (studentsRes.ok) setStudents(await studentsRes.json());
+    }
+  };
+
   const updateResident = async (id: string, data: Partial<ResidentApartment>) => {
     const res = await authFetch(`${API_URL}/residents/${id}`, {
       method: 'PUT',
@@ -381,7 +397,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       role, setRole,
       residents, students, businesses, buildings, employees, expenses, maintenanceIssues,
       token, user, login, logout, isAuthenticated: !!token,
-      addResident, addStudent, addBusiness, addBuilding,
+      addResident, addStudent, addBusiness, addBuilding, updateBuilding,
       updateResident, batchUpdateResidents, updateStudent, batchUpdateStudents, updateBusiness,
       softDeleteResident, softDeleteStudent, softDeleteBusiness,
       splitResident,
